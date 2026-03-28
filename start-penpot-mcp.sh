@@ -211,7 +211,7 @@ if [ -n "$TUNNEL_URL" ]; then
   echo "  2. Cowork → Penpot connector → ${TUNNEL_URL}/mcp"
 fi
 echo "  3. Penpot → plugin → Connect to MCP Server"
-echo "  4. Descriptors leeg? ./cursor/sync-penpot-mcp-descriptors.sh"
+echo "  4. MCP-tools ontbreken? ./cursor/sync-penpot-mcp-descriptors.sh"
 echo ""
 echo "  Stop met: Ctrl+C"
 echo "════════════════════════════════════════════════"
