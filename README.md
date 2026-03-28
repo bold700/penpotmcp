@@ -2,6 +2,8 @@
 
 Design rechtstreeks in Penpot via Claude (Cowork).
 
+**Cursor:** zie [cursor-setup.md](cursor-setup.md) voor lokale MCP op `http://localhost:4401/mcp` (geen tunnel nodig). **Handoff voor Claude / na reboot:** [HANDOFF-CLAUDE.md](HANDOFF-CLAUDE.md).
+
 ## Eerste keer instellen
 
 ### 1. Penpot MCP installeren
