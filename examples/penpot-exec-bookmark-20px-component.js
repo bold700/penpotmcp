@@ -38,38 +38,52 @@ function ensureFill(svg, hex) {
   return svg.replace(/<path /g, '<path fill="' + hex + '" ');
 }
 
-function applyTokToSvgRoot(root, tok) {
-  if (!tok || !root || !tok.applyToShapes) return;
+/**
+ * Penpot-plugin: applyToken/applyToShapes op shapes faalt vaak (token_proxy-validatie in de bridge).
+ * Wél betrouwbaar: fill als tokenreferentie met accolades, bv. "{md.light.onSurface}".
+ */
+function setFillTokenReferenceOnRoot(root, tokenName) {
+  if (!root || !tokenName) return 0;
   const leaves = penpotUtils.findShapes(
     (s) => s.fills && s.fills.length > 0,
     root,
   );
-  if (leaves.length) tok.applyToShapes(leaves, ["fill"]);
+  const ref = "{" + tokenName + "}";
+  for (let i = 0; i < leaves.length; i++) {
+    const s = leaves[i];
+    const op =
+      s.fills[0] && s.fills[0].fillOpacity != null ? s.fills[0].fillOpacity : 1;
+    s.fills = [{ fillColor: ref, fillOpacity: op }];
+  }
+  return leaves.length;
 }
 
-function applyTokMainFromBoard(board, tok) {
-  if (!board || !tok) return;
-  const pCanvas = penpotUtils.findShapes(
-    (s) => s.type === "path" && s.fills && s.fills.length > 0,
+function applyTokToSvgRoot(root, tokenName) {
+  setFillTokenReferenceOnRoot(root, tokenName);
+}
+
+function applyTokMainFromBoard(board, tokenName) {
+  if (!board || !tokenName) return 0;
+  let n = setFillTokenReferenceOnRoot(board, tokenName);
+  const anyComp = penpotUtils.findShape(
+    (s) => typeof s.component === "function",
     board,
-  )[0];
-  if (!pCanvas || !pCanvas.component) return;
-  const comp = pCanvas.component();
-  const main = comp && comp.mainInstance && comp.mainInstance();
-  if (!main) return;
-  const pMain = penpotUtils.findShapes(
-    (s) => s.type === "path" && s.fills && s.fills.length > 0,
-    main,
-  )[0];
-  if (pMain) tok.applyToShapes([pMain], ["fill"]);
+  );
+  if (anyComp) {
+    const comp = anyComp.component();
+    const main = comp && comp.mainInstance && comp.mainInstance();
+    if (main) {
+      n += setFillTokenReferenceOnRoot(main, tokenName);
+    }
+  }
+  return n;
 }
 
-function reapplyTokenOnAllVariantMains(vc, tok) {
-  if (!tok || !vc) return 0;
+function reapplyTokenOnAllVariantMains(vc, tokenName) {
+  if (!tokenName || !vc) return 0;
   let n = 0;
   for (let i = 0; i < vc.children.length; i++) {
-    applyTokMainFromBoard(vc.children[i], tok);
-    n++;
+    n += applyTokMainFromBoard(vc.children[i], tokenName);
   }
   return n;
 }
@@ -87,9 +101,9 @@ if (existingVc && existingVc.variants) {
   const props = Vx.properties || [];
   const nComp = Vx.variantComponents ? Vx.variantComponents().length : 0;
   if (props.length === 1 && props[0] === "Fill" && nComp === 2) {
-    const tokx = ensureTok();
-    reapplyTokenOnAllVariantMains(existingVc, tokx);
-    sleepMs(120);
+    ensureTok();
+    reapplyTokenOnAllVariantMains(existingVc, TOKEN_NAME);
+    sleepMs(250);
     return {
       ok: true,
       skipped: true,
@@ -129,16 +143,17 @@ function buildImported(hexSvg) {
   const g = penpot.createShapeFromSvg(ensureFill(hexSvg, FALLBACK_HEX));
   if (!g) return null;
   g.resize(20, 20);
-  applyTokToSvgRoot(g, tok);
+  applyTokToSvgRoot(g, TOKEN_NAME);
   g.x = ox;
   g.y = oy;
   page.root.appendChild(g);
   penpot.library.local.createComponent([g]);
-  sleepMs(100);
+  sleepMs(150);
   const comp = g.parent && g.parent.component && g.parent.component();
   if (comp && comp.mainInstance) {
-    applyTokToSvgRoot(comp.mainInstance(), tok);
+    applyTokToSvgRoot(comp.mainInstance(), TOKEN_NAME);
   }
+  sleepMs(200);
   return g.parent;
 }
 
@@ -168,13 +183,13 @@ vc.appendChild(g1root);
 
 vc.name = VC_NAME;
 
-reapplyTokenOnAllVariantMains(vc, tok);
-sleepMs(150);
+reapplyTokenOnAllVariantMains(vc, TOKEN_NAME);
+sleepMs(200);
 
 const V = vc.variants;
 if (!V) return { error: "Geen variants" };
 
-sleepMs(150);
+sleepMs(200);
 V.renameProperty(0, "Fill");
 while (V.properties.length > 1) {
   V.removeProperty(V.properties.length - 1);
@@ -186,8 +201,9 @@ if (comps.length >= 2) {
   comps[1].setVariantProperty(0, "fill-1");
 }
 
-sleepMs(120);
-reapplyTokenOnAllVariantMains(vc, tok);
+sleepMs(200);
+reapplyTokenOnAllVariantMains(vc, TOKEN_NAME);
+sleepMs(250);
 
 return {
   ok: true,

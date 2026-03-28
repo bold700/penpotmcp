@@ -27,6 +27,27 @@ function ensureMdLightOnSurface() {
   return penpotUtils.findTokenByName(TOKEN_NAME);
 }
 
+function sleepMs(ms) {
+  const t0 = Date.now();
+  while (Date.now() - t0 < ms) {}
+}
+
+/** Plugin-bridge: fill koppelen via "{tokenNaam}" — applyToken faalt op token_proxy. */
+function setFillTokenReferenceOnRoot(root, tokenName) {
+  if (!root || !tokenName) return 0;
+  const leaves = penpotUtils.findShapes(function (s) {
+    return s.fills && s.fills.length > 0;
+  }, root);
+  const ref = "{" + tokenName + "}";
+  for (let i = 0; i < leaves.length; i++) {
+    const s = leaves[i];
+    const op =
+      s.fills[0] && s.fills[0].fillOpacity != null ? s.fills[0].fillOpacity : 1;
+    s.fills = [{ fillColor: ref, fillOpacity: op }];
+  }
+  return leaves.length;
+}
+
 const TARGET_PAGE_NAME = "Symbols";
 const page = penpotUtils.getPageByName(TARGET_PAGE_NAME);
 if (!page) {
@@ -55,29 +76,23 @@ let updated = 0;
 const boards = vc.children;
 for (let i = 0; i < boards.length; i++) {
   const board = boards[i];
-  const pCanvas = penpotUtils.findShapes(function (s) {
-    return s.type === "path" && s.fills && s.fills.length > 0;
-  }, board)[0];
-  if (!pCanvas || !pCanvas.component) {
-    continue;
-  }
-  const comp = pCanvas.component();
-  const main = comp && comp.mainInstance && comp.mainInstance();
-  if (!main) {
-    continue;
-  }
-  const pMain = penpotUtils.findShapes(function (s) {
-    return s.type === "path" && s.fills && s.fills.length > 0;
-  }, main)[0];
-  if (pMain && tok.applyToShapes) {
-    tok.applyToShapes([pMain], ["fill"]);
-    updated++;
+  updated += setFillTokenReferenceOnRoot(board, TOKEN_NAME);
+  const anyComp = penpotUtils.findShape(function (s) {
+    return typeof s.component === "function";
+  }, board);
+  if (anyComp) {
+    const comp = anyComp.component();
+    const main = comp && comp.mainInstance && comp.mainInstance();
+    if (main) {
+      updated += setFillTokenReferenceOnRoot(main, TOKEN_NAME);
+    }
   }
 }
+sleepMs(250);
 
 return {
   ok: true,
   container: VC_NAME,
-  token: tok.name,
-  mainPathsUpdated: updated,
+  token: TOKEN_NAME,
+  shapesTouched: updated,
 };
