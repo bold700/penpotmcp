@@ -1,9 +1,11 @@
 /**
  * Penpot MCP execute_code — zet "Bookmark 20px" op pagina Symbols om tot library-component.
- * Assets-pad (mappen via " / "): Symbols / Material / Rounded / bookmark / 20px
+ * Assets-pad: Symbols / Material / Rounded / {maat} / {icoon} — icoon-naam altijd als laatste segment.
  * Fill-token op main path: md.light.onSurface
  */
-const COMPONENT_NAME = "Symbols / Material / Rounded / bookmark / 20px";
+const COMPONENT_NAME = "Symbols / Material / Rounded / 20px / bookmark";
+/** Oud pad (migratie zoeken) */
+const LEGACY_COMPONENT_NAME = "Symbols / Material / Rounded / bookmark / 20px";
 const TOKEN_NAME = "md.light.onSurface";
 const FALLBACK_HEX = "#1D1B20";
 const TARGET_PAGE = "Symbols";
@@ -42,7 +44,10 @@ if (!page) return { error: "Geen pagina " + TARGET_PAGE };
 penpot.openPage(page);
 
 const shape = penpotUtils.findShape(
-  (s) => s.name === "Bookmark 20px" || s.name === COMPONENT_NAME,
+  (s) =>
+    s.name === "Bookmark 20px" ||
+    s.name === COMPONENT_NAME ||
+    s.name === LEGACY_COMPONENT_NAME,
   page.root,
 );
 if (!shape) return { error: "Geen Bookmark 20px op " + TARGET_PAGE };
