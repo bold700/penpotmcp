@@ -3,3 +3,5 @@
 ssl/*.pem
 ssl/*-key.pem
 certs/
+# Tijdelijke MCP chunk-/payload-bestanden (lokaal)
+.penpot-mcp-chunks/
