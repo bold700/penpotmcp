@@ -1,0 +1,19 @@
+---
+description: Vaste regels voor Penpot-iconen via MCP (component, varianten, token, maten)
+alwaysApply: true
+---
+
+# Penpot-iconen (dit project)
+
+Wanneer de gebruiker iconen in Penpot wil toevoegen of aanpassen via MCP `execute_code`:
+
+1. **Kleur is verplicht** — altijd een **design token** op de fill, niet alleen vaste hex. Gebruik de tokenreferentie in de fill: `{md.light.onSurface}` (of de exacte tokennaam uit het bestand). Zorg dat het token bestaat (`ensureToken` / Material Icons-set).
+2. **Component is verplicht** — elk icoon gaat via `penpot.library.local.createComponent`.
+3. **Varianten zijn verplicht** — één variantengroep met precies twee assen:
+   - **Size**: `20px`, `24px`, `40px`, `48px`
+   - **Fill**: `fill-0` en `fill-1`
+4. **Aantal varianten**: 4 × 2 = **8** main components in één container.
+5. **Naam variantcontainer**: `Symbols / Material / Rounded / <icoon-slug>` (icoon-slug als laatste segment).
+6. **Implementatie-referentie**: pas `examples/penpot-icon-pipeline.js` aan (`CONFIG`, `D_OUTLINE` / `D_FILL` voor een ander icoon) en voer dat uit als `execute_code`-body.
+
+Geen losse hulp-scripts toevoegen; houd één pipeline-bestand en hergebruik dezelfde structuur.
