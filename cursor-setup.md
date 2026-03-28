@@ -11,7 +11,7 @@ cd ~/Documents/GitHub/penpotmcp && ./start-penpot-mcp.sh
 Dit start:
 - MCP Server op `http://localhost:4401/mcp`
 - Plugin server op `http://localhost:4400`
-- Cloudflare tunnel (voor als je die nodig hebt)
+- Optioneel een Cloudflare tunnel (alleen als `cloudflared` geïnstalleerd is en je geen `PENPOT_MCP_NO_TUNNEL=1` / `PENPOT_MCP_LOCAL_ONLY=1` zet). Mislukt de tunnel, blijft lokaal MCP gewoon draaien.
 
 ## Stap 2: Cursor MCP Configuratie
 
@@ -141,3 +141,5 @@ return { id: board.id };
 - **"Already connected" error**: Het script patcht dit automatisch. Als het toch voorkomt, herstart het script.
 - **Plugin toont geen Connect knop**: Refresh de Penpot pagina en open de plugin opnieuw.
 - **Server niet bereikbaar**: Check of het script nog draait in de terminal.
+- **Cursor ziet geen Penpot-tools (`execute_code` ontbreekt)**: Draai `./cursor/sync-penpot-mcp-descriptors.sh` vanuit deze repo en herstart MCP in Cursor (Command Palette: **MCP: Restart Servers**).
+- **Alleen lokaal, geen tunnel**: Start met `PENPOT_MCP_NO_TUNNEL=1 ./start-penpot-mcp.sh`.

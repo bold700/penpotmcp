@@ -5,6 +5,7 @@
 # Lokaal MCP: http://localhost:4401/mcp (o.a. Cursor)
 # Plugin:     http://localhost:4400/manifest.json
 # Optioneel:  Cloudflare tunnel voor HTTPS-clients (Cowork, enz.)
+# Zonder tunnel: PENPOT_MCP_NO_TUNNEL=1 of PENPOT_MCP_LOCAL_ONLY=1
 # ============================================================
 
 set -e
@@ -161,58 +162,71 @@ else
   PLUGIN_PID=""
 fi
 
-# ── 6. HTTPS tunnel via Cloudflare ─────────────────────────────
-if ! command -v cloudflared &>/dev/null; then
-  echo "⚠️  cloudflared niet gevonden. Installeer:"
-  echo "   brew install cloudflared"
-  echo ""
-  echo "   MCP server draait op http://localhost:4401/mcp"
-  wait $SERVER_PID
-  exit 0
-fi
-
-echo "🌐 Cloudflare tunnel starten..."
-cloudflared tunnel --url http://127.0.0.1:4401 \
-  > /tmp/cloudflared-penpot.log 2>&1 &
-TUNNEL_PID=$!
-
-# Wacht tot de tunnel URL beschikbaar is (max 15 sec)
+# ── 6. Optioneel: Cloudflare-tunnel (Cowork / HTTPS-clients) ─────────────
+TUNNEL_PID=""
 TUNNEL_URL=""
-for i in $(seq 1 30); do
-  TUNNEL_URL=$(grep -o 'https://[a-z0-9-]*\.trycloudflare\.com' /tmp/cloudflared-penpot.log 2>/dev/null | head -1)
-  if [ -n "$TUNNEL_URL" ]; then break; fi
-  sleep 0.5
-done
-
-if [ -z "$TUNNEL_URL" ]; then
-  echo "❌ Tunnel kon niet starten. Log:"
-  cat /tmp/cloudflared-penpot.log
-  kill $SERVER_PID 2>/dev/null
-  exit 1
+if [ -n "${PENPOT_MCP_NO_TUNNEL:-}" ] || [ -n "${PENPOT_MCP_LOCAL_ONLY:-}" ]; then
+  echo "⏭️  Tunnel overgeslagen (PENPOT_MCP_NO_TUNNEL / PENPOT_MCP_LOCAL_ONLY)."
+  echo "   Alleen lokaal: http://localhost:4401/mcp"
+elif ! command -v cloudflared &>/dev/null; then
+  echo "⚠️  cloudflared niet geïnstalleerd — alleen lokaal MCP:"
+  echo "   http://localhost:4401/mcp"
+  echo "   (brew install cloudflared voor optionele HTTPS-tunnel)"
+else
+  echo "🌐 Cloudflare tunnel starten..."
+  cloudflared tunnel --url http://127.0.0.1:4401 \
+    > /tmp/cloudflared-penpot.log 2>&1 &
+  TUNNEL_PID=$!
+  for _i in $(seq 1 30); do
+    TUNNEL_URL=$(grep -o 'https://[a-z0-9-]*\.trycloudflare\.com' /tmp/cloudflared-penpot.log 2>/dev/null | head -1)
+    if [ -n "$TUNNEL_URL" ]; then break; fi
+    sleep 0.5
+  done
+  if [ -z "$TUNNEL_URL" ]; then
+    echo "⚠️  Tunnel kreeg geen URL (netwerk?). MCP blijft lokaal bereikbaar:"
+    echo "   http://localhost:4401/mcp"
+    if [ -n "$TUNNEL_PID" ]; then
+      kill "$TUNNEL_PID" 2>/dev/null || true
+      TUNNEL_PID=""
+    fi
+    echo "   Log: /tmp/cloudflared-penpot.log"
+  else
+    echo "   Tunnel: ${TUNNEL_URL}/mcp"
+  fi
 fi
 
 echo ""
 echo "════════════════════════════════════════════════"
-echo "✅ ALLES DRAAIT!"
+echo "✅ Penpot MCP draait"
 echo ""
-echo "   Cursor / lokaal MCP:"
-echo "   http://localhost:4401/mcp"
-echo ""
-echo "   MCP URL voor Cowork (HTTPS tunnel, kopieer dit!):"
-echo ""
-echo "   ${TUNNEL_URL}/mcp"
+echo "   Lokaal (Cursor): http://localhost:4401/mcp"
+if [ -n "$TUNNEL_URL" ]; then
+  echo ""
+  echo "   Tunnel (Cowork e.d.): ${TUNNEL_URL}/mcp"
+fi
 echo ""
 echo "Stappen:"
-echo "  1. Cursor: zie cursor-setup.md → ~/.cursor/mcp.json"
-echo "  2. Cowork → Settings → Connectors → Penpot"
-echo "     URL: ${TUNNEL_URL}/mcp → Add"
-echo "  3. Penpot (Chrome) → plugin → Connect to MCP Server"
-echo "  4. Praat met je AI-assistent en begin te designen!"
+echo "  1. Cursor: ~/.cursor/mcp.json → url http://localhost:4401/mcp (zie cursor-setup.md)"
+if [ -n "$TUNNEL_URL" ]; then
+  echo "  2. Cowork → Penpot connector → ${TUNNEL_URL}/mcp"
+fi
+echo "  3. Penpot → plugin → Connect to MCP Server"
+echo "  4. Descriptors leeg? ./cursor/sync-penpot-mcp-descriptors.sh"
 echo ""
 echo "  Stop met: Ctrl+C"
 echo "════════════════════════════════════════════════"
 echo ""
 
-# Wacht tot Ctrl+C
-trap "kill $SERVER_PID $PLUGIN_PID $TUNNEL_PID 2>/dev/null; echo ''; echo '👋 Gestopt.'; exit 0" INT
-wait
+cleanup() {
+  kill "$SERVER_PID" 2>/dev/null || true
+  [ -n "${PLUGIN_PID:-}" ] && kill "$PLUGIN_PID" 2>/dev/null || true
+  [ -n "$TUNNEL_PID" ] && kill "$TUNNEL_PID" 2>/dev/null || true
+  echo ""
+  echo "👋 Gestopt."
+  exit 0
+}
+trap cleanup INT
+wait "$SERVER_PID" || true
+[ -n "${PLUGIN_PID:-}" ] && kill "$PLUGIN_PID" 2>/dev/null || true
+[ -n "$TUNNEL_PID" ] && kill "$TUNNEL_PID" 2>/dev/null || true
+exit 0

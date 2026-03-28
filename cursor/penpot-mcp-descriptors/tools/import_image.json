@@ -1,0 +1,26 @@
+{
+  "name": "import_image",
+  "description": "Imports a pixel image from the local file system into Penpot by creating a Rectangle instance that uses the image as a fill. The rectangle has the image's original proportions by default. Optionally accepts position (x, y) and dimensions (width, height). Supported formats: JPEG, PNG, GIF, WEBP.",
+  "arguments": {
+    "type": "object",
+    "properties": {
+      "filePath": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Absolute path to the image file to import."
+      },
+      "x": { "type": "number", "description": "Optional X coordinate." },
+      "y": { "type": "number", "description": "Optional Y coordinate." },
+      "width": {
+        "type": "number",
+        "description": "Optional width; if only width is given, height follows aspect ratio."
+      },
+      "height": {
+        "type": "number",
+        "description": "Optional height; if only height is given, width follows aspect ratio."
+      }
+    },
+    "required": ["filePath"],
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  }
+}

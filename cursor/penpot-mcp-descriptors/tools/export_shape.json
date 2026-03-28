@@ -1,0 +1,30 @@
+{
+  "name": "export_shape",
+  "description": "Exports a shape (or a shape's image fill) from the Penpot design to a PNG or SVG image, such that you can get an impression of what it looks like. Alternatively, you can save it to a file when file system access is enabled on the server.",
+  "arguments": {
+    "type": "object",
+    "properties": {
+      "shapeId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Identifier of the shape to export. Use the special identifier 'selection' to export the first shape currently selected by the user."
+      },
+      "format": {
+        "type": "string",
+        "enum": ["svg", "png"],
+        "description": "The output format, either 'png' (default) or 'svg'."
+      },
+      "mode": {
+        "type": "string",
+        "enum": ["shape", "fill"],
+        "description": "Export mode: 'shape' (full shape including descendants) or 'fill' (raw image fill; PNG only)."
+      },
+      "filePath": {
+        "type": "string",
+        "description": "Optional absolute file path to save the export."
+      }
+    },
+    "required": ["shapeId"],
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  }
+}
