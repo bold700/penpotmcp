@@ -1,56 +1,111 @@
-#!/usr/bin/env bash
-# Penpot MCP (HTTP) + lokale HTTPS-proxy voor Cursor.
-# Repo-root: sibling van dit script.
-#
-# Poorten: 4400 plugin, 4401 MCP (HTTP), 4402 WebSocket, 8443 MCP (HTTPS → 4401).
-# Plugin in Penpot: http://localhost:4400/manifest.json
-# Cursor: zie cursor/mcp.penpot-entry.json — URL https://localhost:8443/mcp
-#
-# Certificaten: ./ssl/ (mkcert). Eenmalig systeem vertrouwen:
-#   mkcert -install
-set -euo pipefail
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CERT_DIR="${ROOT}/ssl"
-CERT="${CERT_DIR}/localhost+2.pem"
-KEY="${CERT_DIR}/localhost+2-key.pem"
-HTTP_PORT=4401
-HTTPS_PORT=8443
+#!/bin/bash
+# ============================================================
+# Penpot MCP Startup Script
+# Gebruik: ./start-penpot-mcp.sh
+# ============================================================
 
-if [[ ! -f "$CERT" || ! -f "$KEY" ]]; then
-  echo "Geen certificaat in $CERT_DIR — aanmaken met:"
-  echo "  cd \"$CERT_DIR\" && mkcert localhost 127.0.0.1 ::1"
+set -e
+
+echo "🚀 Penpot MCP opstarten..."
+
+# ── 1. Vind het juiste npx cache pad ────────────────────────
+MCP_SERVER=$(find ~/.npm/_npx -name "index.js" \
+  -path "*/penpot/mcp/packages/server/dist/index.js" \
+  2>/dev/null | head -1)
+
+if [ -z "$MCP_SERVER" ]; then
+  echo "❌ Penpot MCP niet gevonden in cache. Eerst installeren..."
+  echo "   Draai: npx -y @penpot/mcp@'>=0'"
+  echo "   Wacht tot het klaar is, druk dan Ctrl+C en start dit script opnieuw."
   exit 1
 fi
 
-cleanup() {
-  if [[ -n "${PENPOT_PID:-}" ]] && kill -0 "$PENPOT_PID" 2>/dev/null; then
-    kill "$PENPOT_PID" 2>/dev/null || true
-    wait "$PENPOT_PID" 2>/dev/null || true
-  fi
-}
-trap cleanup EXIT INT TERM HUP
+MCP_DIR=$(dirname "$MCP_SERVER")
+MCP_ROOT=$(echo "$MCP_SERVER" | sed 's|/packages/server/dist/index.js||')
+echo "✅ Gevonden: $MCP_SERVER"
 
-echo "Penpot MCP starten (HTTP) op achtergrond…"
-npx -y '@penpot/mcp@>=0' "$@" &
-PENPOT_PID=$!
+# ── 2. Patch de "Already connected to a transport" bug ──────
+PATCH_CHECK=$(grep -c "_s.connect" "$MCP_SERVER" 2>/dev/null || echo "0")
 
-echo "Wachten tot poort $HTTP_PORT open is…"
-for _ in $(seq 1 90); do
-  if bash -c "echo >/dev/tcp/127.0.0.1/${HTTP_PORT}" 2>/dev/null; then
-    break
+if [ "$PATCH_CHECK" = "0" ]; then
+  echo "🔧 Patch toepassen..."
+  node -e "
+    const fs = require('fs');
+    const p = '$MCP_SERVER';
+    let c = fs.readFileSync(p, 'utf8');
+    const old = 'await this.server.connect(transport);';
+    const fix = '{const _s=this.server;if(_s._transport){try{await _s._transport.close();}catch(e){}}_s._transport=undefined;await _s.connect(transport);}';
+    const n = c.split(old).length - 1;
+    if (n > 0) {
+      c = c.split(old).join(fix);
+      fs.writeFileSync(p, c);
+      console.log('  ✅ Patch toegepast op ' + n + ' plek(ken)');
+    } else {
+      console.log('  ⚠️  Patroon niet gevonden (al gepatcht of versie veranderd)');
+    }
+  "
+else
+  echo "✅ Patch al aanwezig, overgeslagen"
+fi
+
+# ── 3. Config bestand kopiëren ──────────────────────────────
+if [ ! -f "$HOME/data/initial_instructions.md" ]; then
+  echo "📄 Config bestand kopiëren..."
+  INSTRUCTIONS=$(find "$MCP_ROOT" -name "initial_instructions.md" 2>/dev/null | head -1)
+  if [ -n "$INSTRUCTIONS" ]; then
+    mkdir -p "$HOME/data"
+    cp "$INSTRUCTIONS" "$HOME/data/initial_instructions.md"
+    echo "  ✅ Gekopieerd naar ~/data/"
+  else
+    echo "  ⚠️  initial_instructions.md niet gevonden"
   fi
-  sleep 1
+else
+  echo "✅ Config bestand al aanwezig"
+fi
+
+# ── 4. Bestaande processen stoppen ──────────────────────────
+echo "🛑 Bestaande MCP processen stoppen..."
+lsof -i :4401 -t | xargs kill 2>/dev/null && echo "  ✅ Poort 4401 vrijgemaakt" || echo "  ✅ Poort 4401 was al vrij"
+sleep 1
+
+# ── 5. MCP Server starten ───────────────────────────────────
+echo "⚙️  MCP Server starten op poort 4401..."
+cd "$MCP_DIR"
+node index.js &
+SERVER_PID=$!
+sleep 2
+
+if kill -0 $SERVER_PID 2>/dev/null; then
+  echo "  ✅ Server gestart (PID: $SERVER_PID)"
+else
+  echo "  ❌ Server mislukt om te starten"
+  exit 1
+fi
+
+# ── 6. Cloudflare tunnel starten ────────────────────────────
+echo ""
+echo "🌐 Cloudflare tunnel starten..."
+echo "   (wacht op URL...)"
+echo ""
+
+cloudflared tunnel --url http://127.0.0.1:4401 2>&1 | while IFS= read -r line; do
+  echo "$line"
+  if echo "$line" | grep -q "trycloudflare.com"; then
+    URL=$(echo "$line" | grep -o 'https://[^ ]*trycloudflare\.com' | head -1)
+    if [ -n "$URL" ]; then
+      echo ""
+      echo "════════════════════════════════════════════════"
+      echo "✅ KLAAR! Gebruik deze URL in Cowork:"
+      echo ""
+      echo "   ${URL}/mcp"
+      echo ""
+      echo "Stappen:"
+      echo "  1. Cowork → Settings → Connectors → Penpot → Edit URL"
+      echo "  2. Plak: ${URL}/mcp"
+      echo "  3. Klik Connect"
+      echo "  4. Penpot browser plugin → Connect to MCP Server"
+      echo "════════════════════════════════════════════════"
+      echo ""
+    fi
+  fi
 done
-if ! bash -c "echo >/dev/tcp/127.0.0.1/${HTTP_PORT}" 2>/dev/null; then
-  echo "Timeout: Penpot luistert niet op $HTTP_PORT."
-  exit 1
-fi
-
-echo "HTTPS-proxy op https://localhost:${HTTPS_PORT} → http://127.0.0.1:${HTTP_PORT}"
-echo "Plugin-URL: http://localhost:4400/manifest.json"
-echo "Stoppen: Ctrl+C"
-npx -y local-ssl-proxy \
-  --source "$HTTPS_PORT" \
-  --target "$HTTP_PORT" \
-  --cert "$CERT" \
-  --key "$KEY"
