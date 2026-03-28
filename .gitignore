@@ -2,3 +2,4 @@
 # Lokale mkcert-bestanden — niet committen
 ssl/*.pem
 ssl/*-key.pem
+certs/
