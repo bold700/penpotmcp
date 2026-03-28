@@ -13,7 +13,13 @@ Wanneer de gebruiker iconen in Penpot wil toevoegen of aanpassen via MCP `execut
    - **Size**: `20px`, `24px`, `40px`, `48px`
    - **Fill**: `fill-0` en `fill-1`
 4. **Aantal varianten**: 4 × 2 = **8** main components in één container.
-5. **Naam variantcontainer**: `Symbols / Material / Rounded / <icoon-slug>` (icoon-slug als laatste segment).
-6. **Implementatie-referentie**: pas `examples/penpot-icon-pipeline.js` aan (`CONFIG`, `D_OUTLINE` / `D_FILL` voor een ander icoon) en voer dat uit als `execute_code`-body.
+5. **Naam variantcontainer**: `Symbols / Material / Rounded / <icoon-slug>` (icoon-slug als laatste segment; zelfde naam als GitHub-map, meestal `snake_case`).
+6. **Bron voor vector**: altijd eerst zoeken in [google/material-design-icons → symbols/web](https://github.com/google/material-design-icons/tree/master/symbols/web). De gebruiker noemt een icoon → bepaal de mapnaam (bv. `bookmark`, `favorite`, `account_balance`).
+7. **Stijl**: standaard **Rounded** — subdirectory **`materialsymbolsrounded`**. Alleen een andere stijl gebruiken als de gebruiker dat expliciet vraagt (`materialsymbolsoutlined`, `materialsymbolssharp`).
+8. **Bestandsnamen** (in die map): voor elke maat 20 / 24 / 40 / 48:
+   - fill-0: `<slug>_<px>px.svg`
+   - fill-1: `<slug>_fill1_<px>px.svg`  
+   Raw-URL-patroon: `https://raw.githubusercontent.com/google/material-design-icons/master/symbols/web/<slug>/<stijlmap>/<bestandsnaam>`
+9. **Penpot heeft geen fetch**: de agent haalt de 8 SVG’s op (curl of MCP-fetch), vult het `SVGS`-object in `examples/penpot-icon-pipeline.js`, zet `CONFIG.ICON_SLUG` en `CONFIG.MATERIAL_STYLE_DIR`, en voert het bestand als `execute_code` uit.
 
 Geen losse hulp-scripts toevoegen; houd één pipeline-bestand en hergebruik dezelfde structuur.
