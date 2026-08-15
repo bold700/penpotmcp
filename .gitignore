@@ -5,3 +5,8 @@ ssl/*-key.pem
 certs/
 # Tijdelijke MCP chunk-/payload-bestanden (lokaal)
 .penpot-mcp-chunks/
+examples/.mcp-chunk-out/
+
+# Lokale mkcert dev-certificaten
+certs/
+*.pem
